@@ -8,23 +8,26 @@ typedef struct row {
 	int len;
 	char* string;
 	char* mainvar;
-	int shouldcheck;
+	char operation;
 	struct row* next;
 }row;
 
-int readstring(row** head, row** temp);
-int comparestrings(char* source, char* with);
-row* newlist(char* str, int len);
-row* addrow(row* prev, char* str, int len);
+int readstring(row** head, row** temp); //чтение строк
+int comparestrings(char* source, char* with); //сравнение строк
+row* newlist(char* str, int len); //создание заглавного элемента списка
+row* addrow(row* prev, char* str, int len); //добавить структуру в список
 void printlist(row* head);
 int checksyntax(row* list);
-int includedstr(char str, char* check);
-void takemainvar(row** tmp);
-void checktwins(row* main, row** head);
+int includedstr(char str, char* check); //проверка, въодит ли символ в множество
+void takemainvar(row** tmp); //выделение главной части
+void checktwins(row* main, row** head); //нахождение одинаковых строк
 int deletetwins(row* prevp, row* mainp, row* twin, row** head);
-char* strslice(char* str, int begin, int end);
+char* strslice(char* str, int begin, int end); //разрез строки
 void deleteitem(row* prev, row* delv, row** head);
 row* reverserows(row* tmp);
+void freeall(row* tmp);
+int comparetwosides(char* source, char* with);
+void getoperation(row* tmp);
 
 int main() {
 	setlocale(0, "rus");
@@ -49,12 +52,18 @@ int main() {
 		takemainvar(&temp);
 		temp = temp->next;
 	}
+
+	temp = head;
+	getoperation(temp);
+
 	temp = head;
 	checktwins(temp, &head);
 
 	head = reverserows(head);
 	printf("\nКонечная программа:\n");
 	printlist(head);
+	freeall(head);
+	return 0;
 }
 
 
@@ -66,7 +75,7 @@ int readstring(row** head, row** temp) {
 		return 0;
 	tmpstr[0] = '\0';
 
-	for (a = 0; a < 100 && (c = getchar()) != '\n'; a++)
+	for (a = 0; (c = getchar()) != '\n'; a++)
 	{
 		tmpstr = realloc(tmpstr, (a + 2) * sizeof(char));
 		if (!tmpstr)
@@ -124,7 +133,6 @@ row* newlist(char* str, int len) {
 		tmp->next = NULL;
 		tmp->len = len;
 		tmp->string = str;
-		tmp->shouldcheck = 0;
 		return tmp;
 	}
 	else
@@ -137,7 +145,6 @@ row* addrow(row* prev, char* str, int len) {
 		tmp->next = prev;
 		tmp->len = len;
 		tmp->string = str;
-		tmp->shouldcheck = 0;
 		return tmp;
 	}
 	else
@@ -228,41 +235,58 @@ void takemainvar(row** tmp) {
 		return;
 	tmpstr[0] = '\0';
 	int i = 0;
-		while ((((*tmp)->string)[i]) != '=')
-		{
-			tmpstr = realloc(tmpstr, (i + 2) * sizeof(char));
-			if (!tmpstr)
-				break;
-			tmpstr[i] = (char)(((*tmp)->string)[i]);
-			tmpstr[i + 1] = '\0';
-			i++;
-		}
-		(*tmp)->mainvar = tmpstr;
+	while ((((*tmp)->string)[i]) != '=')
+	{
+		tmpstr = realloc(tmpstr, (i + 2) * sizeof(char));
+		if (!tmpstr)
+			break;
+		tmpstr[i] = (char)(((*tmp)->string)[i]);
+		tmpstr[i + 1] = '\0';
+		i++;
+	}
+	(*tmp)->mainvar = tmpstr;
 }
 
 void checktwins(row* main, row** head) {
-	row* prevp = NULL, *nextp;
+	row* prevp = NULL, * nextp;
 	while (main) {
 		int wc = 0;
 		row* tmp = ((main)->next);
 		while (tmp) {
-			if (comparestrings((tmp)->string, (main)->string)) {
-				wc = 1;
-				nextp = main->next;
-				if (deletetwins(prevp, main, tmp, &(*head))) {
-					prevp = NULL;
-					main = nextp;
-					break;
+			if (includedstr(main->operation, "-/")) {
+				if (comparestrings((tmp)->string, (main)->string)) {
+					wc = 1;
+					nextp = main->next;
+					if (deletetwins(prevp, main, tmp, &(*head))) {
+						main = nextp;
+						break;
+					}
+					else {
+						prevp = main;
+						main = (main)->next;
+						break;
+					}
 				}
-				else {
-					prevp = main;
-					main = (main)->next;
-					break;
+			}
+			else if (includedstr(main->operation, "+*")) {
+				if (comparetwosides((tmp)->string, (main)->string)) {
+					wc = 1;
+					nextp = main->next;
+					if (deletetwins(prevp, main, tmp, &(*head))) {
+						main = nextp;
+						break;
+					}
+					else {
+						prevp = main;
+						main = (main)->next;
+						break;
+					}
 				}
 			}
 			tmp = (tmp)->next;
 		}
 		if (!wc) {
+			prevp = main;
 			main = main->next;
 		}
 	}
@@ -283,12 +307,12 @@ char* strslice(char* str, int begin, int end) {
 	if (!tmpstr)
 		return '\0';
 	tmpstr[0] = '\0';
-	for (int i = begin; i < end; i++){
-		tmpstr = realloc(tmpstr, (i-begin + 2) * sizeof(char));
+	for (int i = begin; i < end; i++) {
+		tmpstr = realloc(tmpstr, (i - begin + 2) * sizeof(char));
 		if (!tmpstr)
 			break;
-		tmpstr[i-begin] = (char)(str[i]);
-		tmpstr[i-begin + 1] = '\0';
+		tmpstr[i - begin] = (char)(str[i]);
+		tmpstr[i - begin + 1] = '\0';
 	}
 	return tmpstr;
 }
@@ -298,10 +322,10 @@ int deletetwins(row* prevp, row* mainp, row* twin, row** head) {
 	while ((mainp->string)[i]) {
 		if ((mainp->string)[i] == '=')
 			start = i + 1;
-		if (includedstr((mainp->string)[i], "+-*/;")) {
+		if (includedstr((mainp->string)[i], "+*-/;")) {
 			end = i;
 			row* tmp = mainp->next;
-			while (tmp!=twin && tmp) {
+			while (tmp != twin->next && tmp) {
 				if (comparestrings(tmp->mainvar, strslice(mainp->string, start, end))) {
 					waschanges = 1;
 					break;
@@ -310,6 +334,7 @@ int deletetwins(row* prevp, row* mainp, row* twin, row** head) {
 			}
 			start = end + 1;
 		}
+
 		i++;
 	}
 	if (!waschanges) {
@@ -338,4 +363,73 @@ row* reverserows(row* tmp) {
 		tmp = nextp;
 	}
 	return prev;
+}
+
+void freeall(row* tmp) {
+	row* next;
+	while (tmp) {
+		next = tmp->next;
+		free(tmp);
+		tmp = next;
+	}
+}
+
+int comparetwosides(char* source, char* with) {
+	int start, end, i = 0, num = 1;
+	char* a = "\0", * b = "\0", * c = "\0", * d = "\0";
+	char* sta = "\0", stb = "\0";
+	while (source[i]) {
+		if (source[i] == '=') {
+			start = i + 1;
+			sta = strslice(source, 0, start);
+		}
+		if (includedstr(source[i], "+*-/;")) {
+			end = i;
+			switch (num) {
+			case 1: a = strslice(source, start, end); break;
+			case 2: b = strslice(source, start, end); break;
+			}
+			num++;
+			start = end + 1;
+		}
+		i++;
+	}
+	i = 0;
+	while (with[i]) {
+		if (with[i] == '=') {
+			start = i + 1;
+			stb = strslice(with, 0, start);
+		}
+		if (includedstr(with[i], "+*-/;")) {
+			end = i;
+			switch (num) {
+			case 3: c = strslice(with, start, end);
+			case 4: d = strslice(with, start, end);
+			}
+			num++;
+			start = end + 1;
+		}
+		i++;
+	}
+	if (a && b && c && d) {
+		if ((comparestrings(a, d) && comparestrings(b, c)) || (comparestrings(a, c) && comparestrings(b, d)) && sta == stb)
+			return 1;
+		else
+			return 0;
+	}
+}
+
+
+void getoperation(row* tmp) {
+	while (tmp) {
+		int i = 0;
+		while ((tmp->string)[i]) {
+			if (includedstr((tmp->string)[i], "+*-/")) {
+				tmp->operation = (tmp->string)[i];
+				break;
+			}
+			i++;
+		}
+		tmp = tmp->next;
+	}
 }

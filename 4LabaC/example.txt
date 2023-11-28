@@ -1,0 +1,10 @@
+x=f*a;
+a=o/l;
+x=f*a;
+j=p-w;
+j=p-w;
+x=f*a;
+a=x+y;
+b=x+y;
+a=y+x;
+b=y+x;
